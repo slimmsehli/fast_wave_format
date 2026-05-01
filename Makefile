@@ -14,3 +14,17 @@ comp_varints:
 
 run_varints:
 	./parser_varints sim.vcd sim_varints.wave
+
+
+comp_read_fwf:
+	g++ -std=c++20 -O3 -Wall reader_fwf.cpp -o reader_fwf 
+
+run_read_fwf:
+	time ./reader_fwf sim_varints.wave
+
+
+comp_read_vcd:
+	g++ -std=c++20 -O3 -Wall reader_vcd.cpp -o reader_vcd
+
+run_read_vcd:
+	time ./reader_vcd sim.vcd
