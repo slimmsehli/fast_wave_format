@@ -1,4 +1,5 @@
-sim.vcd
+*.vcd
 parser
 newsim
 venv
+*.wave

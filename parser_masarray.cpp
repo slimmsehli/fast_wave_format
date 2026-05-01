@@ -22,22 +22,15 @@ struct SignalInfo {
     std::string vcd_id; 
 };
 
-struct ColumnBuffer {
-    uint32_t signal_id;
-    uint32_t width_bits;
-    std::vector<uint32_t> time_deltas; 
-    std::vector<uint8_t> data;         
-};
-
-// --- 2. The Chunk Builder (Transposition Buffer) ---
-
-// Update the struct to use time_indices instead of time_deltas
+// UPDATED for Master Time Dictionary
 struct ColumnBuffer {
     uint32_t signal_id;
     uint32_t width_bits;
     std::vector<uint16_t> time_indices; // 2-byte pointers to the Master Array
     std::vector<uint8_t> data;         
 };
+
+// --- 2. The Chunk Builder (Master Array Version) ---
 
 class ChunkBuilder {
 private:
@@ -50,11 +43,9 @@ private:
 
     uint16_t getMasterTimeIndex(uint64_t current_time) {
         uint32_t delta = current_time - chunk_start_time;
-        // If it's a new time step, add it to the master array
         if (master_time_deltas.empty() || master_time_deltas.back() != delta) {
             master_time_deltas.push_back(delta);
         }
-        // Return its index (guaranteed to fit in uint16_t for chunks < 65k ticks)
         return static_cast<uint16_t>(master_time_deltas.size() - 1);
     }
 
@@ -103,6 +94,14 @@ public:
             if (!pair.second.time_indices.empty()) active_columns++;
         }
 
+        if (active_columns == 0) {
+            chunk_start_time = next_start_time;
+            return;
+        }
+
+        std::cout << "Flushing chunk spanning " << chunk_start_time << " to " 
+                  << (chunk_start_time + max_time_per_chunk) << "...\n";
+
         uint64_t chunk_end_time = chunk_start_time + max_time_per_chunk;
         outfile.write(reinterpret_cast<const char*>(&chunk_start_time), sizeof(chunk_start_time));
         outfile.write(reinterpret_cast<const char*>(&chunk_end_time), sizeof(chunk_end_time));
@@ -148,11 +147,9 @@ private:
     
     ChunkBuilder chunk_builder;
 
-    // Strips leading and trailing whitespace, tabs, and hidden Windows \r characters
     std::string_view trim(std::string_view sv) {
         size_t start = sv.find_first_not_of(" \t\r\n");
-        if (start == std::string_view::npos) return ""; // String is all whitespace
-        
+        if (start == std::string_view::npos) return ""; 
         size_t end = sv.find_last_not_of(" \t\r\n");
         return sv.substr(start, end - start + 1);
     }
@@ -208,15 +205,12 @@ public:
         bool in_header = true;
 
         while (std::getline(infile, line)) {
-            // Trim whitespace and \r before doing anything else
             std::string_view sv = trim(line);
             if (sv.empty()) continue;
 
             if (in_header) {
-                // Using .starts_with (Requires C++20)
                 if (sv.starts_with("$enddefinitions")) {
                     in_header = false;
-                    
                     outfile.write("WAVE", 4); 
                     
                     uint32_t num_sigs = signal_metadata.size();
@@ -232,12 +226,10 @@ public:
                     parseVarDef(sv);
                 }
             } else {
-                // UPDATED: Now passing outfile to parseDumpLine
                 parseDumpLine(sv, outfile);
             }
         }
         
-        // Final flush
         chunk_builder.flushToDisk(outfile, current_time);
         
         infile.close();
@@ -261,13 +253,11 @@ private:
         }
     }
 
-    // UPDATED: Signature now correctly accepts the std::ofstream reference
     void parseDumpLine(std::string_view line, std::ofstream& outfile) {
         if (line[0] == '#') {
             current_time = std::stoull(std::string(line.substr(1)));
             
             if (chunk_builder.requiresFlush(current_time)) {
-                // UPDATED: Correctly passing outfile and current_time
                 chunk_builder.flushToDisk(outfile, current_time);
             }
         } 
@@ -277,7 +267,6 @@ private:
                 std::string_view value = line.substr(1, space_idx - 1);
                 std::string_view vcd_id = line.substr(space_idx + 1);
                 
-                // Simple safety check in case a weird VCD declares a bus late
                 if (vcd_id_to_int.find(std::string(vcd_id)) != vcd_id_to_int.end()) {
                     uint32_t int_id = vcd_id_to_int[std::string(vcd_id)];
                     std::vector<uint8_t> bytes = binaryStringToBytes(value);
@@ -309,10 +298,9 @@ int main(int argc, char* argv[]) {
     std::string input_filepath = argv[1];
     std::string output_filepath = argv[2];
 
-    // Initialize converter with a chunk size of 10,000 time ticks
-    VcdConverter converter(10000); 
+    VcdConverter converter(10000000); 
     
-    std::cout << "Starting Waveform Compiler...\n";
+    std::cout << "Starting Waveform Compiler (Master Array Version)...\n";
     converter.processVCD(input_filepath, output_filepath);
     
     return 0;

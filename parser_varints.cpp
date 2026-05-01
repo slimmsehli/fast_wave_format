@@ -31,32 +31,11 @@ struct ColumnBuffer {
 
 // --- 2. The Chunk Builder (Transposition Buffer) ---
 
-// Update the struct to use time_indices instead of time_deltas
-struct ColumnBuffer {
-    uint32_t signal_id;
-    uint32_t width_bits;
-    std::vector<uint16_t> time_indices; // 2-byte pointers to the Master Array
-    std::vector<uint8_t> data;         
-};
-
 class ChunkBuilder {
 private:
     uint64_t chunk_start_time;
     uint64_t max_time_per_chunk;
     std::unordered_map<uint32_t, ColumnBuffer> columns;
-    
-    // --- MASTER TIME ARRAY ---
-    std::vector<uint32_t> master_time_deltas;
-
-    uint16_t getMasterTimeIndex(uint64_t current_time) {
-        uint32_t delta = current_time - chunk_start_time;
-        // If it's a new time step, add it to the master array
-        if (master_time_deltas.empty() || master_time_deltas.back() != delta) {
-            master_time_deltas.push_back(delta);
-        }
-        // Return its index (guaranteed to fit in uint16_t for chunks < 65k ticks)
-        return static_cast<uint16_t>(master_time_deltas.size() - 1);
-    }
 
 public:
     ChunkBuilder(uint64_t chunk_duration) 
@@ -70,9 +49,9 @@ public:
 
     void addWireChange(uint32_t signal_id, uint64_t current_time, LogicState state) {
         auto& col = columns[signal_id];
-        col.time_indices.push_back(getMasterTimeIndex(current_time));
+        col.time_deltas.push_back(current_time - chunk_start_time);
 
-        size_t num_changes = col.time_indices.size() - 1;
+        size_t num_changes = col.time_deltas.size() - 1;
         uint8_t bit_offset = (num_changes % 4) * 2; 
 
         if (bit_offset == 0) {
@@ -84,7 +63,7 @@ public:
 
     void addBusChange(uint32_t signal_id, uint64_t current_time, const std::vector<uint8_t>& raw_bytes) {
         auto& col = columns[signal_id];
-        col.time_indices.push_back(getMasterTimeIndex(current_time));
+        col.time_deltas.push_back(current_time - chunk_start_time);
         col.data.insert(col.data.end(), raw_bytes.begin(), raw_bytes.end());
     }
 
@@ -92,15 +71,29 @@ public:
         return (current_time - chunk_start_time) >= max_time_per_chunk;
     }
 
+    // UPDATED: Now takes the outfile stream
+    // Add this helper inside your ChunkBuilder class
+    void encodeVarint(std::vector<uint8_t>& buffer, uint32_t value) {
+        do {
+            uint8_t byte = value & 0x7F; // Get bottom 7 bits
+            value >>= 7;
+            if (value != 0) byte |= 0x80; // Set continuation bit if more data
+            buffer.push_back(byte);
+        } while (value != 0);
+    }
+
+    // Replace your flushToDisk with this:
     void flushToDisk(std::ofstream& outfile, uint64_t next_start_time) {
-        if (!outfile.is_open() || master_time_deltas.empty()) {
-            chunk_start_time = next_start_time;
-            return; 
-        }
+        if (!outfile.is_open()) return;
 
         uint32_t active_columns = 0;
         for (const auto& pair : columns) {
-            if (!pair.second.time_indices.empty()) active_columns++;
+            if (!pair.second.time_deltas.empty()) active_columns++;
+        }
+
+        if (active_columns == 0) {
+            chunk_start_time = next_start_time;
+            return; 
         }
 
         uint64_t chunk_end_time = chunk_start_time + max_time_per_chunk;
@@ -108,31 +101,33 @@ public:
         outfile.write(reinterpret_cast<const char*>(&chunk_end_time), sizeof(chunk_end_time));
         outfile.write(reinterpret_cast<const char*>(&active_columns), sizeof(active_columns));
 
-        // --- WRITE THE MASTER TIME ARRAY ONCE ---
-        uint32_t num_master_times = master_time_deltas.size();
-        outfile.write(reinterpret_cast<const char*>(&num_master_times), sizeof(num_master_times));
-        outfile.write(reinterpret_cast<const char*>(master_time_deltas.data()), num_master_times * sizeof(uint32_t));
-
         for (auto& pair : columns) {
             auto& col = pair.second;
-            if (col.time_indices.empty()) continue;
+            if (col.time_deltas.empty()) continue;
 
             outfile.write(reinterpret_cast<const char*>(&col.signal_id), sizeof(col.signal_id));
             
-            // Write Indices (2 bytes each instead of 4)
-            uint32_t num_indices = col.time_indices.size();
-            outfile.write(reinterpret_cast<const char*>(&num_indices), sizeof(num_indices));
-            outfile.write(reinterpret_cast<const char*>(col.time_indices.data()), num_indices * sizeof(uint16_t));
+            // --- VARINT COMPRESSION START ---
+            std::vector<uint8_t> compressed_deltas;
+            for (uint32_t delta : col.time_deltas) {
+                encodeVarint(compressed_deltas, delta);
+            }
+            
+            // Write the number of original deltas, then the compressed byte size
+            uint32_t num_deltas = col.time_deltas.size();
+            uint32_t compressed_size = compressed_deltas.size();
+            outfile.write(reinterpret_cast<const char*>(&num_deltas), sizeof(num_deltas));
+            outfile.write(reinterpret_cast<const char*>(&compressed_size), sizeof(compressed_size));
+            outfile.write(reinterpret_cast<const char*>(compressed_deltas.data()), compressed_size);
+            // --- VARINT COMPRESSION END ---
 
             uint32_t num_bytes = col.data.size();
             outfile.write(reinterpret_cast<const char*>(&num_bytes), sizeof(num_bytes));
             outfile.write(reinterpret_cast<const char*>(col.data.data()), num_bytes);
 
-            col.time_indices.clear();
+            col.time_deltas.clear();
             col.data.clear();
         }
-
-        master_time_deltas.clear();
         chunk_start_time = next_start_time;
     }
 };
@@ -310,7 +305,7 @@ int main(int argc, char* argv[]) {
     std::string output_filepath = argv[2];
 
     // Initialize converter with a chunk size of 10,000 time ticks
-    VcdConverter converter(10000); 
+    VcdConverter converter(10000000); 
     
     std::cout << "Starting Waveform Compiler...\n";
     converter.processVCD(input_filepath, output_filepath);
