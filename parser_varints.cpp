@@ -295,17 +295,18 @@ private:
 // --- 4. Main Entry Point ---
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
+    if (argc < 4) {
         std::cerr << "Error: Missing arguments.\n";
-        std::cerr << "Usage: " << argv[0] << " <input.vcd> <output.wave>\n";
+        std::cerr << "Usage: " << argv[0] << " <input.vcd> <output.wave> <input.chunks>\n";
         return 1; 
     }
 
     std::string input_filepath = argv[1];
     std::string output_filepath = argv[2];
+    int chunks = std::stoi(argv[3]);
 
     // Initialize converter with a chunk size of 10,000 time ticks
-    VcdConverter converter(10000000); 
+    VcdConverter converter(chunks); 
     
     std::cout << "Starting Waveform Compiler...\n";
     converter.processVCD(input_filepath, output_filepath);

@@ -39,3 +39,20 @@ bench:
 	#g++ -std=c++20 -O3 -Wall reader_fwf.cpp -o reader_fwf
 	time ./reader_fwf sim_heavy.wave
 	time ./reader_vcd sim.vcd
+
+variant:
+	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
+	./parser_masarray sim_heavy.vcd sim_heavy_masarray_100.wave 100
+	./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000.wave 1000
+	./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000.wave 10000
+	./parser_masarray sim_heavy.vcd sim_heavy_masarray_100000.wave 100000
+	./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000000.wave 1000000
+	./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000000.wave 10000000
+	g++ -std=c++20 -O3 -Wall parser_varints.cpp -o parser_varints 
+	./parser_varints sim_heavy.vcd sim_heavy_varints_100.wave 100
+	./parser_varints sim_heavy.vcd sim_heavy_varints_1000.wave 1000
+	./parser_varints sim_heavy.vcd sim_heavy_varints_10000.wave 10000
+	./parser_varints sim_heavy.vcd sim_heavy_varints_100000.wave 100000
+	./parser_varints sim_heavy.vcd sim_heavy_varints_1000000.wave 1000000
+	./parser_varints sim_heavy.vcd sim_heavy_varints_10000000.wave 10000000
+	
