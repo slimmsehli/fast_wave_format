@@ -3,3 +3,4 @@ parser
 newsim
 venv
 *.wave
+*.log

@@ -288,7 +288,14 @@ private:
 
 // --- 4. Main Entry Point ---
 
+#include <iostream>
+#include <chrono>
+#include <sys/resource.h>
+
 int main(int argc, char* argv[]) {
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     if (argc < 4) {
         std::cerr << "Error: Missing arguments.\n";
         std::cerr << "Usage: " << argv[0] << " <input.vcd> <output.wave> <input.chunks>\n";
@@ -303,6 +310,20 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Starting Waveform Compiler (Master Array Version)...\n";
     converter.processVCD(input_filepath, output_filepath);
+
+    // 2. Stop the clock
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end_time - start_time;
+    // 3. Get memory usage
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    // Note: ru_maxrss is in Kilobytes on Linux, but Bytes on macOS. 
+    // Assuming Linux here:
+    long memory_kb = usage.ru_maxrss;
+    // 4. Print the results
+    std::cout << "\n--- Execution Metrics ---" << std::endl;
+    std::cout << "Time taken: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << "Peak memory used: " << memory_kb << " KB" << std::endl;
     
     return 0;
 }

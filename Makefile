@@ -1,7 +1,7 @@
 
 
 clean:
-	rm -rf parser wave *.wave newsim parser_varints parser_masarray
+	rm -rf parser wave *.wave newsim parser_varints parser_masarray *.log
 
 comp_masarray:
 	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
@@ -40,19 +40,30 @@ bench:
 	time ./reader_fwf sim_heavy.wave
 	time ./reader_vcd sim.vcd
 
+# CHUNK_SIZES=(1000 5000 10000 50000 100000 500000 1000000 5000000)
+test:
+	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
+	./parser_masarray sim.vcd sim.wave 10000000 > sim.log &
+
 variant:
 	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_100.wave 100
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000.wave 1000
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000.wave 10000
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_100000.wave 100000
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000000.wave 1000000
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000000.wave 10000000
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000.wave 1000 > sim_heavy_masarray_1000.log &
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_5000.wave 5000 > sim_heavy_masarray_5000.log & 
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000.wave 10000 > sim_heavy_masarray_10000.log & 
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_50000.wave 50000 > sim_heavy_masarray_50000.log & 
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_100000.wave 100000 > sim_heavy_masarray_100000.log & 
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000000.wave 1000000 > sim_heavy_masarray_1000000.log & 
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_50000000.wave 50000000 > sim_heavy_masarray_50000000.log & 
+	time ./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000000.wave 10000000 > sim_heavy_masarray_10000000.log & 
+
+variant2:
 	g++ -std=c++20 -O3 -Wall parser_varints.cpp -o parser_varints 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_100.wave 100
-	./parser_varints sim_heavy.vcd sim_heavy_varints_1000.wave 1000
-	./parser_varints sim_heavy.vcd sim_heavy_varints_10000.wave 10000
-	./parser_varints sim_heavy.vcd sim_heavy_varints_100000.wave 100000
-	./parser_varints sim_heavy.vcd sim_heavy_varints_1000000.wave 1000000
-	./parser_varints sim_heavy.vcd sim_heavy_varints_10000000.wave 10000000
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_1000.wave 1000 > sim_heavy_varints_1000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_5000.wave 5000 > sim_heavy_varints_5000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_10000.wave 10000 > sim_heavy_varints_10000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_50000.wave 50000 > sim_heavy_varints_50000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_100000.wave 100000 > sim_heavy_varints_100000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_1000000.wave 1000000 > sim_heavy_varints_1000000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_10000000.wave 10000000 > sim_heavy_varints_10000000.log & 
+	time ./parser_varints sim_heavy.vcd sim_heavy_varints_50000000.wave 50000000 > sim_heavy_varints_50000000.log & 
 	
