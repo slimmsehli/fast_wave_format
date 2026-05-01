@@ -28,3 +28,14 @@ comp_read_vcd:
 
 run_read_vcd:
 	time ./reader_vcd sim.vcd
+
+gen:
+	g++ -O3 vcd_generator.cpp -o vcd_generator
+	./vcd_generator sim_heavy.vcd
+
+bench:
+	#g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
+	#./parser_masarray sim_heavy.vcd sim_heavy.wave 1000000
+	#g++ -std=c++20 -O3 -Wall reader_fwf.cpp -o reader_fwf
+	time ./reader_fwf sim_heavy.wave
+	time ./reader_vcd sim.vcd
