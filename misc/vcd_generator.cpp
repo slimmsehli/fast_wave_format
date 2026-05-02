@@ -16,7 +16,23 @@ std::string getVcdId(uint32_t id) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string filename = (argc > 1) ? argv[1] : "heavy_sim.vcd";
+    std::string filename = "heavy_sim.vcd";
+    uint64_t target_size_mb = 1024; // Default to 1024 MB (1GB)
+
+    if (argc > 1) {
+        filename = argv[1];
+    }
+    
+    // --- NEW: Parse size from command-line argument ---
+    if (argc > 2) {
+        try {
+            target_size_mb = std::stoull(argv[2]);
+        } catch (const std::exception& e) {
+            std::cerr << "Invalid size argument. Please provide the target size in MB as an integer.\n";
+            return 1;
+        }
+    }
+
     std::ofstream file(filename, std::ios::binary); // binary mode for faster writing
 
     if (!file.is_open()) {
@@ -24,8 +40,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::cout << "Starting generation of 1GB VCD file: " << filename << "\n";
-    std::cout << "This may take 10-20 seconds...\n";
+    std::cout << "Starting generation of " << target_size_mb << " MB VCD file: " << filename << "\n";
+    std::cout << "This may take a moment depending on the size...\n";
 
     // --- 1. Write Header ---
     file << "$date Today $end\n";
@@ -61,8 +77,8 @@ int main(int argc, char* argv[]) {
     bool clk = false;
     bool target_wire_state = false;
     
-    // 1 Gigabyte target (1024 * 1024 * 1024 bytes)
-    const std::streampos TARGET_SIZE = 1073741824ULL; 
+    // --- NEW: Calculate target size dynamically based on user input ---
+    const std::streampos TARGET_SIZE = target_size_mb * 1024ULL * 1024ULL; 
 
     // Pre-allocate a buffer to hold the states of the 5000 wires so we know when they flip
     std::vector<bool> wire_states(num_wires, false);
@@ -94,7 +110,7 @@ int main(int argc, char* argv[]) {
 
         sim_time += 5; // Advance time by 5ns
 
-        // Every 10,000 steps, check if we hit 1GB on the hard drive
+        // Every 10,000 steps, check if we hit the target size on the hard drive
         if (sim_time % 50000 == 0) {
             if (file.tellp() >= TARGET_SIZE) {
                 break;

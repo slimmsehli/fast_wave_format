@@ -1,73 +1,37 @@
 
+# CHUNK_SIZES=(1000 5000 10000 50000 100000 500000 1000000 5000000)
+
+test_path:=${PWD}/test_dir
+misc_path:=${PWD}/misc
+converter_path:=${PWD}/converter
+reader_path:=${PWD}/reader
+binary:=${PWD}/bin
+chunks:=10000000
 
 clean:
-	rm -rf parser wave *.wave newsim parser_varints parser_masarray *.log
+	rm -rf parser wave *.wave newsim parser_varints parser_masarray *.log test_dir/* bin/*
 
-comp_masarray:
-	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
+# generate a test vcd file that has 1GB of data for test
+generate_vcd:
+	g++ -O3 ${misc_path}/vcd_generator.cpp -o ${binary}/vcd_generator 2>&1 | tee -a ${test_path}/log_vcd_generate.log
+	${binary}/vcd_generator ${test_path}/sim.vcd 128 2>&1 | tee -a ${test_path}/log_vcd_generate.log
 
-run:
-	./parser_masarray sim.vcd sim_masarray.wave
+# compile and run the first alog for compression variant
+test_varints:
+	g++ -std=c++20 -O3 -Wall ${converter_path}/converter_varints.cpp -o ${binary}/converter_varints 2>&1 | tee -a ${test_path}/log_converter_varints.log
+	${binary}/converter_varints ${test_path}/sim.vcd ${test_path}/sim_varints_${chunks}.wave ${chunks} 2>&1 | tee -a ${test_path}/log_converter_varints.log
 
-comp_varints:
-	g++ -std=c++20 -O3 -Wall parser_varints.cpp -o parser_varints 
+# compile and run the first alog for compression mas array
+test_masarray:
+	g++ -std=c++20 -O3 -Wall ${converter_path}/converter_masarray.cpp -o ${binary}/converter_masarray 2>&1 | tee -a ${test_path}/log_converter_masarray.log
+	${binary}/converter_masarray ${test_path}/sim.vcd ${test_path}/sim_masarray_${chunks}.wave ${chunks} 2>&1 | tee -a ${test_path}/log_converter_masarray.log
 
-run_varints:
-	./parser_varints sim.vcd sim_varints.wave
+# run the reader from the new wave format  
+test_reader_fwf:
+	g++ -std=c++20 -O3 -Wall ${reader_path}/reader_fwf.cpp -o ${binary}/reader_fwf 2>&1 | tee -a ${test_path}/log_reader_fwf.log
+	${binary}/reader_fwf ${test_path}/sim_varints_${chunks}.wave 2>&1 | tee -a ${test_path}/log_reader_fwf.log
 
-
-comp_read_fwf:
-	g++ -std=c++20 -O3 -Wall reader_fwf.cpp -o reader_fwf 
-
-run_read_fwf:
-	time ./reader_fwf sim_varints.wave
-
-
-comp_read_vcd:
-	g++ -std=c++20 -O3 -Wall reader_vcd.cpp -o reader_vcd
-
-run_read_vcd:
-	time ./reader_vcd sim.vcd
-
-gen:
-	g++ -O3 vcd_generator.cpp -o vcd_generator
-	./vcd_generator sim_heavy.vcd
-
-bench:
-	#g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
-	#./parser_masarray sim_heavy.vcd sim_heavy.wave 1000000
-	#g++ -std=c++20 -O3 -Wall reader_fwf.cpp -o reader_fwf
-	time ./reader_fwf sim_heavy.wave
-	time ./reader_vcd sim.vcd
-
-# CHUNK_SIZES=(1000 5000 10000 50000 100000 500000 1000000 5000000)
-test:
-	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
-	./parser_masarray sim.vcd sim.wave 10000000 > sim.log &
-
-variant:
-	g++ -std=c++20 -O3 -Wall parser_masarray.cpp -o parser_masarray 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000.wave 1000 > sim_heavy_masarray_1000.log &
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_5000.wave 5000 > sim_heavy_masarray_5000.log & 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000.wave 10000 > sim_heavy_masarray_10000.log & 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_50000.wave 50000 > sim_heavy_masarray_50000.log & 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_100000.wave 100000 > sim_heavy_masarray_100000.log & 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_1000000.wave 1000000 > sim_heavy_masarray_1000000.log & 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_50000000.wave 50000000 > sim_heavy_masarray_50000000.log & 
-	./parser_masarray sim_heavy.vcd sim_heavy_masarray_10000000.wave 10000000 > sim_heavy_masarray_10000000.log & 
-
-variant2:
-	g++ -std=c++20 -O3 -Wall parser_varints.cpp -o parser_varints 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_1000.wave 1000 > sim_heavy_varints_1000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_5000.wave 5000 > sim_heavy_varints_5000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_10000.wave 10000 > sim_heavy_varints_10000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_50000.wave 50000 > sim_heavy_varints_50000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_100000.wave 100000 > sim_heavy_varints_100000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_1000000.wave 1000000 > sim_heavy_varints_1000000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_10000000.wave 10000000 > sim_heavy_varints_10000000.log & 
-	./parser_varints sim_heavy.vcd sim_heavy_varints_50000000.wave 50000000 > sim_heavy_varints_50000000.log & 
-	
-
-result:
-	grep -ri "time taken" *.log
-	grep -ri "peak memory" *.log
+# run the reader from the vcd file format 
+test_reader_vcd:
+	g++ -std=c++20 -O3 -Wall ${reader_path}/reader_vcd.cpp -o ${binary}/reader_vcd 2>&1 | tee -a ${test_path}/log_reader_vcd.log
+	${binary}/reader_vcd ${test_path}/sim.vcd 2>&1 | tee -a ${test_path}/log_reader_vcd.log

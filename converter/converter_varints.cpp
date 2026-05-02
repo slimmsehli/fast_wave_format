@@ -328,10 +328,9 @@ int main(int argc, char* argv[]) {
     long memory_kb = usage.ru_maxrss;
     // 4. Print the results
     std::cout << "\n--- Execution Metrics ---" << std::endl;
-    std::cout << "Time taken: " << elapsed.count() << " seconds" << std::endl;
-    std::cout << "Peak memory used: " << memory_kb << " KB" << std::endl;
     std::cout << "Algorithm: MASARRAY " << std::endl;
     std::cout << "Chunks: " << chunks << std::endl;
-    
+    std::cout << "Time taken: " << elapsed.count() << " seconds" << std::endl;
+    std::cout << "Peak memory used: " << memory_kb << " KB" << std::endl;    
     return 0;
 }
